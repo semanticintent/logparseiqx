@@ -28,6 +28,7 @@ from logparseiqx.parsers.cloudflare import (
     filter_errors,
     filter_slow_requests,
     filter_security_events,
+    filter_by_status_class,
     aggregate_by_status,
     aggregate_by_country,
     aggregate_by_ip,
@@ -308,7 +309,7 @@ def cf_errors(ctx, logfile, tail, status):
     console.print("[orange3][CF] Scanning Cloudflare logs for errors...[/orange3]")
     
     if status:
-        filter_func = lambda x: str(x.get('EdgeResponseStatus', '')).startswith(status[:1]) or str(x.get('EdgeResponseStatus', '')) == status
+        filter_func = filter_by_status_class(status)
     else:
         filter_func = filter_errors
     
