@@ -35,6 +35,7 @@ from logparseiqx.parsers.cloudflare import (
     filter_server_errors,
     filter_client_errors,
     filter_by_status,
+    filter_by_status_class,
     filter_slow_requests,
     filter_security_events,
     filter_by_country,
@@ -409,6 +410,21 @@ class TestCloudflareFilters:
         assert filter_5xx({'EdgeResponseStatus': 500}) is True
         assert filter_5xx({'EdgeResponseStatus': 502}) is True
         assert filter_5xx({'EdgeResponseStatus': 404}) is False
+
+    def test_filter_by_status_class(self):
+        """Test that filter_by_status_class matches entire status class by first digit"""
+        # Passing '502' should match all 5xx (uses first digit)
+        filter_from_502 = filter_by_status_class("502")
+        assert filter_from_502({'EdgeResponseStatus': 502}) is True  # Exact match
+        assert filter_from_502({'EdgeResponseStatus': 500}) is True  # Same class (5xx)
+        assert filter_from_502({'EdgeResponseStatus': 503}) is True  # Same class (5xx)
+        assert filter_from_502({'EdgeResponseStatus': 404}) is False  # Different class
+
+        # Passing '4' should match all 4xx
+        filter_4xx = filter_by_status_class("4")
+        assert filter_4xx({'EdgeResponseStatus': 400}) is True
+        assert filter_4xx({'EdgeResponseStatus': 404}) is True
+        assert filter_4xx({'EdgeResponseStatus': 500}) is False
 
     def test_filter_slow_requests(self):
         filter_func = filter_slow_requests(1000)

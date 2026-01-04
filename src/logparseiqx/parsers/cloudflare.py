@@ -153,6 +153,28 @@ def filter_by_status(status_code: str) -> Callable[[Dict], bool]:
     return _filter
 
 
+def filter_by_status_class(status_code: str) -> Callable[[Dict], bool]:
+    """
+    Create a filter that matches an entire HTTP status class.
+
+    Uses the first digit to match all statuses in that class:
+    - '502' or '5' -> matches all 5xx (500, 502, 503, etc.)
+    - '404' or '4' -> matches all 4xx (400, 401, 404, etc.)
+
+    Args:
+        status_code: A status code like '502' or class like '5'
+
+    Returns:
+        Filter function that matches the status class
+    """
+    status_class = status_code[:1]  # First digit determines the class
+
+    def _filter(log: Dict[str, Any]) -> bool:
+        status = str(log.get('EdgeResponseStatus', ''))
+        return status.startswith(status_class) or status == status_code
+    return _filter
+
+
 def filter_slow_requests(threshold_ms: int) -> Callable[[Dict], bool]:
     """Create a filter for slow requests"""
     def _filter(log: Dict[str, Any]) -> bool:
