@@ -7,6 +7,7 @@ to minimize token usage while maximizing insights.
 
 import sys
 import json
+from collections import deque
 from pathlib import Path
 from typing import Optional, List, Callable, Dict, Any
 import click
@@ -57,9 +58,10 @@ def filter_cloudflare_logs(
     
     try:
         with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-            lines = f.readlines()
             if tail:
-                lines = lines[-tail:]
+                lines = list(deque(f, maxlen=tail))
+            else:
+                lines = f.readlines()
     except Exception as e:
         console.print(f"[red][X] Error reading file: {e}[/red]")
         sys.exit(1)
@@ -145,14 +147,6 @@ def filter_client_errors(log: Dict[str, Any]) -> bool:
     return isinstance(status, int) and 400 <= status < 500
 
 
-def filter_by_status(status_code: str) -> Callable[[Dict], bool]:
-    """Create a filter for a specific status code or prefix"""
-    def _filter(log: Dict[str, Any]) -> bool:
-        status = str(log.get('EdgeResponseStatus', ''))
-        return status.startswith(status_code) or status == status_code
-    return _filter
-
-
 def filter_by_status_class(status_code: str) -> Callable[[Dict], bool]:
     """
     Create a filter that matches an entire HTTP status class.
@@ -162,7 +156,7 @@ def filter_by_status_class(status_code: str) -> Callable[[Dict], bool]:
     - '404' or '4' -> matches all 4xx (400, 401, 404, etc.)
 
     Args:
-        status_code: A status code like '502' or class like '5'
+        status_code: A status code like '502' or class prefix like '5'
 
     Returns:
         Filter function that matches the status class
@@ -171,7 +165,7 @@ def filter_by_status_class(status_code: str) -> Callable[[Dict], bool]:
 
     def _filter(log: Dict[str, Any]) -> bool:
         status = str(log.get('EdgeResponseStatus', ''))
-        return status.startswith(status_class) or status == status_code
+        return status.startswith(status_class)
     return _filter
 
 

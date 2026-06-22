@@ -2,6 +2,7 @@
 Ollama integration utilities for LogParseIQX
 """
 
+import os
 import sys
 import json
 import requests
@@ -11,11 +12,11 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 
-# Configuration
-OLLAMA_BASE_URL = "http://localhost:11434"
+# Configuration — all overridable via environment variables
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
 OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
-DEFAULT_MODEL = "qwen2.5:3b"
+DEFAULT_MODEL = os.environ.get("LOGPARSEIQX_MODEL", "qwen2.5:3b")
 DEFAULT_TIMEOUT = 300
 
 
@@ -87,11 +88,11 @@ def query_ollama(
                 if line:
                     data = json.loads(line)
                     chunk = data.get("response", "")
-                    print(chunk, end="", flush=True)
+                    console.print(chunk, end="", highlight=False, markup=False)
                     full_response += chunk
                     if data.get("done", False):
                         break
-            print()  # Newline at end
+            console.print()  # Newline at end
             return full_response
         else:
             response = requests.post(

@@ -84,9 +84,14 @@ def filter_lines(content: str, keywords: List[str], case_sensitive: bool = False
     lines = content.split('\n')
     
     if case_sensitive:
-        return [l for l in lines if any(k in l for k in keywords)]
+        return [line for line in lines if any(k in line for k in keywords)]
     else:
-        return [l for l in lines if any(k in l.lower() for k in [kw.lower() for kw in keywords])]
+        return [line for line in lines if any(k in line.lower() for k in [kw.lower() for kw in keywords])]
+
+
+def needs_chunking(content: str, max_size: int = CHUNK_SIZE * 3) -> bool:
+    """Return True if content exceeds the single-pass context limit"""
+    return len(content) > max_size
 
 
 def get_file_stats(filepath: str) -> dict:

@@ -1,6 +1,6 @@
 """
 LogParseIQX - Local log parser powered by Ollama
-"Like Opus 4.5 Thinking Mode™ but $0"
+"Like cloud AI log analysis but $0"
 
 Part of Millpond AI.
 https://millpond.ai
@@ -14,10 +14,10 @@ __email__ = "mike@millpond.ai"
 BANNER = r"""
  _                ____                     ___ ___  __  __
 | |    ___   __ _|  _ \ __ _ _ __ ___  ___|_ _/ _ \ \ \/ /
-| |   / _ \ / _` | |_) / _` | '__/ __|/ _ \| | | | | \  / 
-| |__| (_) | (_| |  __/ (_| | |  \__ \  __/| | |_| | /  \ 
+| |   / _ \ / _` | |_) / _` | '__/ __|/ _ \| | | | | \  /
+| |__| (_) | (_| |  __/ (_| | |  \__ \  __/| | |_| | /  \
 |_____\___/ \__, |_|   \__,_|_|  |___/\___|___\__\_\/_/\_\
-            |___/                                         
+            |___/
 """
 
-TAGLINE = '"Like Opus 4.5 Thinking Mode but $0"'
+TAGLINE = '"Like cloud AI log analysis but $0"'

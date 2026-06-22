@@ -34,7 +34,6 @@ from logparseiqx.parsers.cloudflare import (
     filter_errors,
     filter_server_errors,
     filter_client_errors,
-    filter_by_status,
     filter_by_status_class,
     filter_slow_requests,
     filter_security_events,
@@ -401,30 +400,26 @@ class TestCloudflareFilters:
         assert filter_client_errors({'EdgeResponseStatus': 500}) is False
         assert filter_client_errors({'EdgeResponseStatus': 200}) is False
 
-    def test_filter_by_status(self):
-        filter_502 = filter_by_status("502")
-        assert filter_502({'EdgeResponseStatus': 502}) is True
-        assert filter_502({'EdgeResponseStatus': 500}) is False
-
-        filter_5xx = filter_by_status("5")
-        assert filter_5xx({'EdgeResponseStatus': 500}) is True
-        assert filter_5xx({'EdgeResponseStatus': 502}) is True
-        assert filter_5xx({'EdgeResponseStatus': 404}) is False
-
     def test_filter_by_status_class(self):
         """Test that filter_by_status_class matches entire status class by first digit"""
-        # Passing '502' should match all 5xx (uses first digit)
+        # Passing '502' matches all 5xx (uses first digit)
         filter_from_502 = filter_by_status_class("502")
-        assert filter_from_502({'EdgeResponseStatus': 502}) is True  # Exact match
-        assert filter_from_502({'EdgeResponseStatus': 500}) is True  # Same class (5xx)
-        assert filter_from_502({'EdgeResponseStatus': 503}) is True  # Same class (5xx)
-        assert filter_from_502({'EdgeResponseStatus': 404}) is False  # Different class
+        assert filter_from_502({'EdgeResponseStatus': 502}) is True
+        assert filter_from_502({'EdgeResponseStatus': 500}) is True
+        assert filter_from_502({'EdgeResponseStatus': 503}) is True
+        assert filter_from_502({'EdgeResponseStatus': 404}) is False
 
-        # Passing '4' should match all 4xx
+        # Passing '4' matches all 4xx
         filter_4xx = filter_by_status_class("4")
         assert filter_4xx({'EdgeResponseStatus': 400}) is True
         assert filter_4xx({'EdgeResponseStatus': 404}) is True
         assert filter_4xx({'EdgeResponseStatus': 500}) is False
+
+        # Passing '2' matches all 2xx
+        filter_2xx = filter_by_status_class("2")
+        assert filter_2xx({'EdgeResponseStatus': 200}) is True
+        assert filter_2xx({'EdgeResponseStatus': 201}) is True
+        assert filter_2xx({'EdgeResponseStatus': 404}) is False
 
     def test_filter_slow_requests(self):
         filter_func = filter_slow_requests(1000)
@@ -680,7 +675,7 @@ class TestCLI:
         result = runner.invoke(cli, ['cost'])
         assert result.exit_code == 0
         assert '$0' in result.output
-        assert 'Opus' in result.output
+        assert 'Claude' in result.output
 
     def test_cli_no_command_shows_banner(self):
         runner = CliRunner()
@@ -921,6 +916,32 @@ class TestCloudflareCommands:
 
             assert result.exit_code == 0
             assert 'Found 2 slow request' in result.output
+        finally:
+            safe_unlink(filepath)
+
+    @patch('logparseiqx.cli.ensure_ollama_running')
+    @patch('logparseiqx.cli.query_ollama')
+    def test_cf_performance_command(self, mock_query, mock_ensure):
+        """Test cf performance command"""
+        mock_query.return_value = "Performance analysis"
+
+        logs = [
+            '{"EdgeResponseStatus": 200, "OriginResponseTime": 100, "EdgeTimeToFirstByteMs": 110, "CacheCacheStatus": "HIT", "ClientRequestURI": "/api/fast"}',
+            '{"EdgeResponseStatus": 200, "OriginResponseTime": 2000, "EdgeTimeToFirstByteMs": 2010, "CacheCacheStatus": "MISS", "ClientRequestURI": "/api/slow"}',
+            '{"EdgeResponseStatus": 200, "OriginResponseTime": 1500, "EdgeTimeToFirstByteMs": 1510, "CacheCacheStatus": "MISS", "ClientRequestURI": "/api/slow"}',
+        ]
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as f:
+            filepath = f.name
+            f.write('\n'.join(logs))
+
+        try:
+            runner = CliRunner()
+            result = runner.invoke(cli, ['cf', 'performance', filepath, '--threshold', '500'])
+
+            assert result.exit_code == 0
+            assert '2/3' in result.output
+            mock_query.assert_called_once()
         finally:
             safe_unlink(filepath)
 

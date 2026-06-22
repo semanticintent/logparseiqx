@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 LogParseIQX - Local log parser powered by Ollama
-"Like Opus 4.5 Thinking Mode™ but $0"
+"Like cloud AI log analysis but $0"
 
 Part of Millpond AI.
 https://millpond.ai
@@ -20,11 +20,12 @@ from logparseiqx.utils import (
     query_ollama,
     DEFAULT_MODEL,
 )
-from logparseiqx.parsers import read_log_file, filter_lines, CHUNK_SIZE
+from logparseiqx.parsers import read_log_file, filter_lines, chunk_text, needs_chunking, CHUNK_SIZE
 from logparseiqx.parsers.cloudflare import (
     filter_cloudflare_logs,
     format_cf_log_compact,
     format_cf_security_compact,
+    format_cf_performance_compact,
     filter_errors,
     filter_slow_requests,
     filter_security_events,
@@ -103,18 +104,51 @@ def parse(ctx, logfile, question, tail):
     console.print()
     
     content = read_log_file(logfile, tail)
-    
-    if question:
+
+    if needs_chunking(content):
+        chunks = chunk_text(content)
+        console.print(f"[dim]   Large file: processing {len(chunks)} chunks...[/dim]")
+        chunk_summaries = []
+        for i, chunk in enumerate(chunks, 1):
+            console.print(f"[dim]   Chunk {i}/{len(chunks)}...[/dim]")
+            chunk_prompt = f"""Briefly summarize the key events, errors, and patterns in this log excerpt (chunk {i} of {len(chunks)}):
+```
+{chunk}
+```
+Keep the summary under 150 words."""
+            summary = query_ollama(chunk_prompt, model, stream=False)
+            chunk_summaries.append(f"[Chunk {i}]: {summary}")
+        combined = "\n\n".join(chunk_summaries)
+        if question:
+            final_prompt = f"""Based on these log summaries, answer the question: {question}
+
+{combined}
+
+Provide a clear, concise answer."""
+        else:
+            final_prompt = f"""Based on these log summaries, provide a final analysis:
+1. What application/service is this from?
+2. What is the general state? (healthy, errors, warnings?)
+3. Any notable events or issues?
+4. Key timestamps and patterns
+
+Summaries:
+{combined}
+
+Be concise and focus on actionable insights."""
+        query_ollama(final_prompt, model)
+    elif question:
         prompt = f"""Analyze this log file and answer the question.
 
 Question: {question}
 
 Log content:
 ```
-{content[:CHUNK_SIZE * 2]}
+{content}
 ```
 
 Provide a clear, concise answer based on the log content."""
+        query_ollama(prompt, model)
     else:
         prompt = f"""Analyze this log file and explain:
 1. What application/service is this from?
@@ -124,12 +158,11 @@ Provide a clear, concise answer based on the log content."""
 
 Log content:
 ```
-{content[:CHUNK_SIZE * 2]}
+{content}
 ```
 
 Be concise and focus on actionable insights."""
-
-    query_ollama(prompt, model)
+        query_ollama(prompt, model)
 
 
 @cli.command()
@@ -145,21 +178,45 @@ def summarize(ctx, logfile, tail):
     console.print()
     
     content = read_log_file(logfile, tail)
-    
-    prompt = f"""Summarize this log file in a brief, executive-style summary:
+
+    if needs_chunking(content):
+        chunks = chunk_text(content)
+        console.print(f"[dim]   Large file: processing {len(chunks)} chunks...[/dim]")
+        chunk_summaries = []
+        for i, chunk in enumerate(chunks, 1):
+            console.print(f"[dim]   Chunk {i}/{len(chunks)}...[/dim]")
+            chunk_prompt = f"""One-paragraph summary of key events in this log excerpt (chunk {i} of {len(chunks)}):
+```
+{chunk}
+```"""
+            summary = query_ollama(chunk_prompt, model, stream=False)
+            chunk_summaries.append(f"[Chunk {i}]: {summary}")
+        combined = "\n\n".join(chunk_summaries)
+        final_prompt = f"""Synthesize these log chunk summaries into a single executive summary:
 - Overall status (1 line)
-- Key events (bullet points)  
+- Key events (bullet points)
+- Any errors or warnings
+- Recommendation (1 line)
+
+Summaries:
+{combined}
+
+Keep under 200 words."""
+        query_ollama(final_prompt, model)
+    else:
+        prompt = f"""Summarize this log file in a brief, executive-style summary:
+- Overall status (1 line)
+- Key events (bullet points)
 - Any errors or warnings (if present)
 - Recommendation (1 line)
 
 Log content:
 ```
-{content[:CHUNK_SIZE * 3]}
+{content}
 ```
 
 Keep the summary under 200 words."""
-
-    query_ollama(prompt, model)
+        query_ollama(prompt, model)
 
 
 @cli.command()
@@ -215,8 +272,36 @@ def analyze(ctx, logfile, tail):
     console.print()
     
     content = read_log_file(logfile, tail)
-    
-    prompt = f"""Perform a deep analysis of this log file:
+
+    if needs_chunking(content):
+        chunks = chunk_text(content)
+        console.print(f"[dim]   Large file: processing {len(chunks)} chunks...[/dim]")
+        chunk_summaries = []
+        for i, chunk in enumerate(chunks, 1):
+            console.print(f"[dim]   Chunk {i}/{len(chunks)}...[/dim]")
+            chunk_prompt = f"""Analyze this log excerpt (chunk {i} of {len(chunks)}) for patterns, anomalies, errors, and security events. Be brief:
+```
+{chunk}
+```"""
+            summary = query_ollama(chunk_prompt, model, stream=False)
+            chunk_summaries.append(f"[Chunk {i}]: {summary}")
+        combined = "\n\n".join(chunk_summaries)
+        final_prompt = f"""Synthesize these log chunk analyses into a full deep analysis:
+
+1. **Patterns**: What recurring patterns appear across chunks?
+2. **Anomalies**: Anything unusual or out of place?
+3. **Timeline**: Key events in chronological order
+4. **Performance**: Any performance indicators or concerns?
+5. **Security**: Any security-related events?
+6. **Recommendations**: Top 3 things to investigate
+
+Chunk analyses:
+{combined}
+
+Think step by step and be thorough."""
+        query_ollama(final_prompt, model)
+    else:
+        prompt = f"""Perform a deep analysis of this log file:
 
 1. **Patterns**: What recurring patterns do you see?
 2. **Anomalies**: Anything unusual or out of place?
@@ -227,12 +312,11 @@ def analyze(ctx, logfile, tail):
 
 Log content:
 ```
-{content[:CHUNK_SIZE * 3]}
+{content}
 ```
 
 Think step by step and be thorough."""
-
-    query_ollama(prompt, model)
+        query_ollama(prompt, model)
 
 
 @cli.command()
@@ -262,14 +346,14 @@ def cost():
 
   Service                   Cost/1M      Total
   -------------------------+------------+-------------
-  Opus 4.5 Thinking Mode    $90          [red]$2,625[/red]
-  Claude Sonnet 4.5         $18          [red]$525[/red]
-  GPT-4                     $60          [red]$1,750[/red]
-  GPT-4o                    $15          [red]$437[/red]
+  Claude Opus (API)         $75          [red]$2,187[/red]
+  Claude Sonnet (API)       $15          [red]$437[/red]
+  GPT-4o (API)              $10          [red]$291[/red]
+  Gemini 1.5 Pro (API)      $7           [red]$204[/red]
   -------------------------+------------+-------------
   LogParseIQX (local)       $0           [green]$0[/green]
 
-[green]Your savings: $2,625 per log file[/green]
+[green]Your savings: up to $2,187+ per log file[/green]
 [bold green]Your cost: $0[/bold green]
 
 [dim]grep "error" logs.txt | head: Still $0, but less insightful :)[/dim]
@@ -397,6 +481,67 @@ Provide:
 2. Any patterns (time of day, specific IPs, etc.)?
 3. Is this a backend issue or Cloudflare edge issue?
 4. Performance optimization recommendations
+
+Be specific and actionable."""
+
+    query_ollama(prompt, model)
+
+
+@cf.command('performance')
+@click.argument('logfile', type=click.Path(exists=True))
+@click.option('--tail', '-n', default=1000, type=int, help='Lines to scan (default: 1000)')
+@click.option('--threshold', '-t', default=500, type=int, help='Slow threshold in ms (default: 500)')
+@click.pass_context
+def cf_performance(ctx, logfile, tail, threshold):
+    """Analyze cache efficiency and edge vs origin latency in Cloudflare logs"""
+    ensure_ollama_running()
+    model = ctx.obj['model']
+
+    console.print(f"[orange3][CF] Analyzing performance (threshold: {threshold}ms)...[/orange3]")
+
+    all_logs = filter_cloudflare_logs(logfile, tail, lambda x: True)
+
+    if not all_logs:
+        console.print("[red][X] No logs found![/red]")
+        return
+
+    slow = [l for l in all_logs if l.get('OriginResponseTime', 0) >= threshold]
+    slow.sort(key=lambda x: x.get('OriginResponseTime', 0), reverse=True)
+
+    console.print(f"[yellow][#] {len(slow)}/{len(all_logs)} requests above {threshold}ms threshold[/yellow]")
+    console.print()
+
+    sample_logs = "\n".join([format_cf_performance_compact(l) for l in slow[:30]])
+
+    times = [l.get('OriginResponseTime', 0) for l in all_logs if isinstance(l.get('OriginResponseTime'), (int, float))]
+    avg_time = sum(times) / len(times) if times else 0
+    max_time = max(times) if times else 0
+
+    from logparseiqx.parsers.cloudflare import aggregate_by_uri
+    top_uris = list(aggregate_by_uri(slow).items())[:10]
+    uri_summary = "\n".join([f"  {uri}: {count}" for uri, count in top_uris])
+
+    prompt = f"""Analyze this Cloudflare performance data:
+
+Stats:
+- Total requests: {len(all_logs)}
+- Slow requests (>{threshold}ms): {len(slow)} ({len(slow)/len(all_logs)*100:.1f}%)
+- Average origin time: {avg_time:.0f}ms
+- Max origin time: {max_time}ms
+
+Slowest endpoints:
+{uri_summary}
+
+Sample slow requests (format: timestamp | uri | status | origin_time | edge_time | cache_status):
+```
+{sample_logs}
+```
+
+Provide:
+1. Which endpoints have the worst performance?
+2. Is this a cache miss problem (MISS/EXPIRED cache status)?
+3. Origin vs edge latency — where is time being lost?
+4. Specific optimization recommendations (caching rules, origin improvements)
 
 Be specific and actionable."""
 
