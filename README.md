@@ -84,18 +84,26 @@ pip install git+https://github.com/semanticintent/logparseiqx.git
 
 ### Quick Start
 
+Sample log files are included in the `examples/` directory so you can try it immediately:
+
 ```bash
-# Parse any log file
-logparseiqx parse application.log
+# Analyze a generic app log
+lpx parse examples/app-sample.log
 
-# Find errors
-logparseiqx errors server.log
+# Find errors and get a root cause explanation
+lpx errors examples/app-sample.log
 
-# Ask a specific question
-logparseiqx parse app.log -q "Why did it crash?"
+# Ask a specific question about a log
+lpx parse examples/app-sample.log -q "Why did the login endpoint fail?"
 
-# Use short alias
-lpx parse app.log
+# Cloudflare: find HTTP errors
+lpx cf errors examples/cloudflare-sample.log
+
+# Cloudflare: check for security threats
+lpx cf security examples/cloudflare-sample.log
+
+# Cloudflare: performance overview
+lpx cf summary examples/cloudflare-sample.log
 ```
 
 ### Generic Commands
@@ -136,11 +144,47 @@ logparseiqx cf slow cloudflare.log --threshold 2000  # >2 seconds
 logparseiqx cf security cloudflare.log
 logparseiqx cf security cloudflare.log --threat-score 20
 
+# Cache efficiency and edge vs origin latency
+logparseiqx cf performance cloudflare.log
+logparseiqx cf performance cloudflare.log --threshold 500  # Flag requests >500ms
+
 # Top requesting IPs (find bots/abuse)
 logparseiqx cf top-ips cloudflare.log --limit 30
 
 # Quick traffic summary
 logparseiqx cf summary cloudflare.log
+```
+
+### Watch Mode
+
+Watch a log file live and get LLM analysis as new lines arrive:
+
+```bash
+# Watch any log file (default: check every 10s)
+lpx watch /var/log/app.log
+
+# Faster polling, larger batch
+lpx watch /var/log/nginx/access.log --interval 5 --batch 100
+
+# Suppress "no new lines" messages
+lpx watch app.log --quiet
+```
+
+Seeks to the **end of the file** on start — only new content is analyzed. Press `Ctrl+C` to stop.
+
+### Save Output
+
+Add `--output` / `-o` to any command to save the LLM response to a file:
+
+```bash
+# Save analysis to a markdown file
+lpx parse app.log --output report.md
+
+# Save Cloudflare security report
+lpx cf security cloudflare.log --output security-report.txt
+
+# Save summary for sharing
+lpx summarize server.log -o summary.md
 ```
 
 ### Other Commands
@@ -240,20 +284,30 @@ logparseiqx/
 
 ## Configuration
 
-### Change default model
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOGPARSEIQX_MODEL` | `qwen2.5:3b` | Default Ollama model |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_MODELS` | *(Ollama default)* | Model storage path |
 
 ```bash
-# Per-command
-logparseiqx --model mistral:7b parse app.log
-
-# Or set environment variable
+# Use a different default model
 export LOGPARSEIQX_MODEL=mistral:7b
+lpx parse app.log
+
+# Point at a remote Ollama instance
+export OLLAMA_HOST=http://my-gpu-server:11434
+lpx cf errors cloudflare.log
+
+# Override model per-command
+lpx --model phi3:mini errors server.log
 ```
 
 ### Store models on external SSD
 
 ```bash
-# Set Ollama model storage location
 export OLLAMA_MODELS=/path/to/external/ssd/ollama/models
 ```
 

@@ -20,7 +20,7 @@ from logparseiqx.utils import (
     query_ollama,
     DEFAULT_MODEL,
 )
-from logparseiqx.parsers import read_log_file, filter_lines, chunk_text, needs_chunking, CHUNK_SIZE
+from logparseiqx.parsers import read_log_file, filter_lines, chunk_text, needs_chunking, tail_file, CHUNK_SIZE
 from logparseiqx.parsers.cloudflare import (
     filter_cloudflare_logs,
     format_cf_log_compact,
@@ -39,6 +39,16 @@ from logparseiqx.parsers.cloudflare import (
 )
 
 console = Console()
+
+
+def _save_output(content: str, filepath: str) -> None:
+    """Write LLM response to a file and print a confirmation."""
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        console.print(f"[dim]   Output saved to {filepath}[/dim]")
+    except Exception as e:
+        console.print(f"[red][X] Could not save output: {e}[/red]")
 
 
 # =============================================================================
@@ -94,8 +104,9 @@ def cli(ctx, model, version):
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--question', '-q', default=None, help='Specific question to answer')
 @click.option('--tail', '-n', default=None, type=int, help='Only parse last N lines')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def parse(ctx, logfile, question, tail):
+def parse(ctx, logfile, question, tail, output):
     """Parse a log file and explain what's happening"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -136,7 +147,7 @@ Summaries:
 {combined}
 
 Be concise and focus on actionable insights."""
-        query_ollama(final_prompt, model)
+        result = query_ollama(final_prompt, model)
     elif question:
         prompt = f"""Analyze this log file and answer the question.
 
@@ -148,7 +159,7 @@ Log content:
 ```
 
 Provide a clear, concise answer based on the log content."""
-        query_ollama(prompt, model)
+        result = query_ollama(prompt, model)
     else:
         prompt = f"""Analyze this log file and explain:
 1. What application/service is this from?
@@ -162,14 +173,18 @@ Log content:
 ```
 
 Be concise and focus on actionable insights."""
-        query_ollama(prompt, model)
+        result = query_ollama(prompt, model)
+
+    if output:
+        _save_output(result, output)
 
 
 @cli.command()
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=500, type=int, help='Lines to summarize (default: 500)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def summarize(ctx, logfile, tail):
+def summarize(ctx, logfile, tail, output):
     """Summarize a log file"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -202,7 +217,7 @@ Summaries:
 {combined}
 
 Keep under 200 words."""
-        query_ollama(final_prompt, model)
+        result = query_ollama(final_prompt, model)
     else:
         prompt = f"""Summarize this log file in a brief, executive-style summary:
 - Overall status (1 line)
@@ -216,14 +231,18 @@ Log content:
 ```
 
 Keep the summary under 200 words."""
-        query_ollama(prompt, model)
+        result = query_ollama(prompt, model)
+
+    if output:
+        _save_output(result, output)
 
 
 @cli.command()
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to analyze (default: 1000)')
-@click.pass_context  
-def errors(ctx, logfile, tail):
+@click.option('--output', '-o', default=None, help='Save output to file')
+@click.pass_context
+def errors(ctx, logfile, tail, output):
     """Find and explain errors in a log file"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -256,14 +275,17 @@ Error lines found:
 
 Be specific and actionable."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 @cli.command()
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to analyze (default: 1000)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def analyze(ctx, logfile, tail):
+def analyze(ctx, logfile, tail, output):
     """Deep analysis - find patterns, anomalies, and insights"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -299,7 +321,7 @@ Chunk analyses:
 {combined}
 
 Think step by step and be thorough."""
-        query_ollama(final_prompt, model)
+        result = query_ollama(final_prompt, model)
     else:
         prompt = f"""Perform a deep analysis of this log file:
 
@@ -316,7 +338,10 @@ Log content:
 ```
 
 Think step by step and be thorough."""
-        query_ollama(prompt, model)
+        result = query_ollama(prompt, model)
+
+    if output:
+        _save_output(result, output)
 
 
 @cli.command()
@@ -362,12 +387,75 @@ def cost():
 
 @cli.command()
 @click.argument('text')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def ask(ctx, text):
+def ask(ctx, text, output):
     """Ask a quick question (no log file needed)"""
     ensure_ollama_running()
     model = ctx.obj['model']
-    query_ollama(text, model)
+    result = query_ollama(text, model)
+    if output:
+        _save_output(result, output)
+
+
+@cli.command()
+@click.argument('logfile', type=click.Path(exists=True))
+@click.option('--interval', '-i', default=10, type=int, help='Seconds between checks (default: 10)')
+@click.option('--batch', '-b', default=50, type=int, help='Max new lines per analysis (default: 50)')
+@click.option('--quiet', '-q', is_flag=True, help='Suppress "no new lines" messages')
+@click.pass_context
+def watch(ctx, logfile, interval, batch, quiet):
+    """Watch a log file and analyze new entries as they arrive
+
+    \b
+    Seeks to the END of the file on start — only new lines are analyzed.
+    Press Ctrl+C to stop.
+
+    \b
+    EXAMPLE:
+        lpx watch /var/log/app.log --interval 5
+        lpx watch /var/log/nginx/access.log --batch 100
+    """
+    ensure_ollama_running()
+    model = ctx.obj['model']
+
+    from datetime import datetime
+
+    console.print(f"[cyan][*] Watching [bold]{logfile}[/bold] (every {interval}s, batch {batch} lines)[/cyan]")
+    console.print("[dim]   Seeking to end of file — only new lines will be analyzed[/dim]")
+    console.print("[dim]   Press Ctrl+C to stop[/dim]\n")
+
+    try:
+        for content, total_new in tail_file(logfile, interval, batch):
+            ts = datetime.now().strftime("%H:%M:%S")
+
+            if not content:
+                if not quiet:
+                    console.print(f"[dim]   [{ts}] No new lines[/dim]")
+                continue
+
+            skipped = total_new - content.count('\n')
+            console.print(f"\n[cyan][*] [{ts}] {total_new} new line(s)"
+                          + (f" — showing last {batch}" if skipped > 0 else "")
+                          + " — analyzing...[/cyan]")
+
+            prompt = f"""Analyze these new log entries. Be brief and focused:
+- Any errors or warnings? If so, what caused them?
+- Anything unusual or worth investigating?
+- Overall status: [OK] healthy / [!] warning / [X] error
+
+New log entries:
+```
+{content}
+```
+
+If nothing is notable, respond with just: "[OK] All clear."
+Otherwise give 2-4 bullet points max."""
+
+            query_ollama(prompt, model)
+
+    except KeyboardInterrupt:
+        console.print("\n[dim]Watching stopped.[/dim]")
 
 
 # =============================================================================
@@ -384,8 +472,9 @@ def cf():
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to scan (default: 1000)')
 @click.option('--status', '-s', default=None, help='Specific status code (e.g., 502, 404)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def cf_errors(ctx, logfile, tail, status):
+def cf_errors(ctx, logfile, tail, status, output):
     """Find HTTP errors (4xx, 5xx) in Cloudflare logs"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -431,15 +520,18 @@ Provide:
 
 Be specific and actionable."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 @cf.command('slow')
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to scan (default: 1000)')
 @click.option('--threshold', '-t', default=1000, type=int, help='Slow threshold in ms (default: 1000)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def cf_slow(ctx, logfile, tail, threshold):
+def cf_slow(ctx, logfile, tail, threshold, output):
     """Find slow requests in Cloudflare logs"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -484,15 +576,18 @@ Provide:
 
 Be specific and actionable."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 @cf.command('performance')
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to scan (default: 1000)')
 @click.option('--threshold', '-t', default=500, type=int, help='Slow threshold in ms (default: 500)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def cf_performance(ctx, logfile, tail, threshold):
+def cf_performance(ctx, logfile, tail, threshold, output):
     """Analyze cache efficiency and edge vs origin latency in Cloudflare logs"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -545,15 +640,18 @@ Provide:
 
 Be specific and actionable."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 @cf.command('security')
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to scan (default: 1000)')
 @click.option('--threat-score', '-t', default=10, type=int, help='Min threat score (default: 10)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def cf_security(ctx, logfile, tail, threat_score):
+def cf_security(ctx, logfile, tail, threat_score, output):
     """Find security events (WAF, threats, blocks) in Cloudflare logs"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -599,15 +697,18 @@ Provide:
 
 Be specific about the threat and actionable in recommendations."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 @cf.command('top-ips')
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=5000, type=int, help='Lines to scan (default: 5000)')
 @click.option('--limit', '-l', default=20, type=int, help='Top N IPs (default: 20)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def cf_top_ips(ctx, logfile, tail, limit):
+def cf_top_ips(ctx, logfile, tail, limit, output):
     """Find top requesting IPs (potential abuse/bots)"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -646,14 +747,17 @@ Provide:
 
 Focus on identifying abuse vs legitimate traffic."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 @cf.command('summary')
 @click.argument('logfile', type=click.Path(exists=True))
 @click.option('--tail', '-n', default=1000, type=int, help='Lines to summarize (default: 1000)')
+@click.option('--output', '-o', default=None, help='Save output to file')
 @click.pass_context
-def cf_summary(ctx, logfile, tail):
+def cf_summary(ctx, logfile, tail, output):
     """Quick summary of Cloudflare traffic"""
     ensure_ollama_running()
     model = ctx.obj['model']
@@ -702,7 +806,9 @@ In 3-5 bullet points:
 
 Be concise."""
 
-    query_ollama(prompt, model)
+    result = query_ollama(prompt, model)
+    if output:
+        _save_output(result, output)
 
 
 # =============================================================================
