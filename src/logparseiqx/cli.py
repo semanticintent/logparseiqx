@@ -20,6 +20,7 @@ from logparseiqx.utils import (
     query_ollama,
     DEFAULT_MODEL,
 )
+from logparseiqx.voice import voice_input, check_voice_deps, WHISPER_MODELS, DEFAULT_WHISPER_MODEL
 from logparseiqx.parsers import read_log_file, filter_lines, chunk_text, needs_chunking, tail_file, CHUNK_SIZE
 from logparseiqx.parsers.cloudflare import (
     filter_cloudflare_logs,
@@ -64,15 +65,15 @@ def cli(ctx, model, version):
     """
     LogParseIQX - Local log parser powered by Ollama
 
-    "Like Opus 4.5 Thinking Mode but $0"
-    
+    "Like cloud AI log analysis but $0"
+
     \b
     USAGE:
         logparseiqx parse <logfile>
         logparseiqx errors <logfile>
         logparseiqx cf errors <cloudflare.log>
-        lpx cf security <cloudflare.log>
-    
+        lpx voice examples/app-sample.log
+
     \b
     Part of Millpond AI.
     https://millpond.ai
@@ -386,14 +387,90 @@ def cost():
 
 
 @cli.command()
-@click.argument('text')
+@click.argument('text', required=False, default=None)
 @click.option('--output', '-o', default=None, help='Save output to file')
+@click.option('--voice', is_flag=True, help='Speak your question instead of typing it')
+@click.option('--whisper', default=DEFAULT_WHISPER_MODEL,
+              type=click.Choice(WHISPER_MODELS), help='Whisper model size (default: base)')
 @click.pass_context
-def ask(ctx, text, output):
-    """Ask a quick question (no log file needed)"""
+def ask(ctx, text, output, voice, whisper):
+    """Ask a quick question (no log file needed)
+
+    \b
+    Type your question:
+        lpx ask "What does a 502 error mean?"
+
+    \b
+    Or speak it:
+        lpx ask --voice
+    """
     ensure_ollama_running()
     model = ctx.obj['model']
+
+    if voice:
+        text = voice_input(whisper_model=whisper)
+        if not text:
+            return
+    elif not text:
+        console.print("[red][X] Provide a question or use --voice[/red]")
+        console.print("[dim]   lpx ask 'your question'[/dim]")
+        console.print("[dim]   lpx ask --voice[/dim]")
+        return
+
     result = query_ollama(text, model)
+    if output:
+        _save_output(result, output)
+
+
+@cli.command()
+@click.argument('logfile', required=False, default=None, type=click.Path(exists=True))
+@click.option('--whisper', default=DEFAULT_WHISPER_MODEL,
+              type=click.Choice(WHISPER_MODELS), help='Whisper model size (default: base)')
+@click.option('--output', '-o', default=None, help='Save output to file')
+@click.pass_context
+def voice(ctx, logfile, whisper, output):
+    """Speak your question — answered by a local LLM, transcribed locally
+
+    \b
+    Ask anything:
+        lpx voice
+
+    \b
+    Ask about a specific log file:
+        lpx voice examples/app-sample.log
+
+    \b
+    Requires: pip install logparseiqx[voice]
+    Nothing leaves your machine — local mic, local ASR, local LLM.
+    """
+    ensure_ollama_running()
+    model = ctx.obj['model']
+
+    if not check_voice_deps():
+        from logparseiqx.voice import require_voice_deps
+        require_voice_deps()
+        return
+
+    text = voice_input(whisper_model=whisper)
+    if not text:
+        return
+
+    if logfile:
+        content = read_log_file(logfile)
+        prompt = f"""Answer this question about the log file below.
+
+Question: {text}
+
+Log content:
+```
+{content[:CHUNK_SIZE * 2]}
+```
+
+Be concise and specific."""
+    else:
+        prompt = text
+
+    result = query_ollama(prompt, model)
     if output:
         _save_output(result, output)
 

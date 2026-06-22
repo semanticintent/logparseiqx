@@ -16,7 +16,7 @@ console = Console()
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
 OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
-DEFAULT_MODEL = os.environ.get("LOGPARSEIQX_MODEL", "qwen2.5:3b")
+DEFAULT_MODEL = os.environ.get("LOGPARSEIQX_MODEL", "llama3:8b")
 DEFAULT_TIMEOUT = 300
 
 

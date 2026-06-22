@@ -155,6 +155,45 @@ logparseiqx cf top-ips cloudflare.log --limit 30
 logparseiqx cf summary cloudflare.log
 ```
 
+### Voice Mode
+
+Speak your question instead of typing it. Transcribed locally via [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Nothing leaves your machine.
+
+**Install:**
+```bash
+pip install logparseiqx[voice]
+```
+
+> First run downloads the Whisper `base` model (~150MB, cached after that).
+
+**Usage:**
+```bash
+# Speak a general question
+lpx voice
+
+# Speak a question about a specific log file
+lpx voice examples/app-sample.log
+
+# Also works as a flag on lpx ask
+lpx ask --voice
+lpx ask --voice examples/app-sample.log  # not valid — use lpx voice for files
+
+# Use a smaller/faster model for quicker transcription
+lpx voice --whisper tiny
+
+# Save both the question and the answer
+lpx voice --output incident-notes.md
+```
+
+**Flow:**
+1. Press Enter to start recording
+2. Speak your question
+3. Press Enter to stop
+4. Transcription shown: `[You]: why is /api/auth returning 500?`
+5. Streamed answer from your local LLM
+
+**Why local?** Your logs contain sensitive infrastructure details. Your questions about those logs are equally sensitive. Both stay on your machine.
+
 ### Watch Mode
 
 Watch a log file live and get LLM analysis as new lines arrive:
@@ -242,21 +281,27 @@ Raw Cloudflare Log (50+ fields, 1000s of lines)
 
 ## Recommended Models
 
-For **8GB RAM** (CPU inference):
+Start here if you have nothing installed yet:
 
-| Model | Size | Speed | Quality | Command |
-|-------|------|-------|---------|---------|
-| **Qwen 2.5 3B** | ~2GB | Fast | Good | `ollama pull qwen2.5:3b` |
-| Phi-3 Mini | ~2.3GB | Fast | Good | `ollama pull phi3:mini` |
-| Mistral 7B Q4 | ~4GB | Medium | Better | `ollama pull mistral:7b-instruct-q4_K_M` |
+```bash
+ollama pull llama3:8b    # Best all-around for log analysis (~5GB)
+```
 
-For **16GB+ RAM**:
+**By RAM:**
 
-| Model | Size | Quality | Command |
-|-------|------|---------|---------|
-| Qwen 2.5 7B | ~4.5GB | Great | `ollama pull qwen2.5:7b` |
-| DeepSeek R1 8B | ~5GB | Excellent | `ollama pull deepseek-r1:8b` |
-| Mistral 7B | ~4GB | Excellent | `ollama pull mistral:7b` |
+| RAM | Recommended | Command |
+|-----|-------------|---------|
+| 8GB | Llama 3 8B | `ollama pull llama3:8b` |
+| 16GB | Gemma 4 12B | `ollama pull gemma4:12b` |
+| 32GB+ | Gemma 4 27B | `ollama pull gemma4:27b` |
+
+**Set your model:**
+```bash
+export LOGPARSEIQX_MODEL=llama3:8b
+lpx parse examples/app-sample.log
+```
+
+Or per-command: `lpx --model gemma4:27b cf errors cloudflare.log`
 
 ---
 
