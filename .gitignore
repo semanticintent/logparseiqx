@@ -48,3 +48,6 @@ htmlcov/
 *.tmp
 temp/
 extracted/
+
+# Allow sample log files in examples/
+!examples/*.log

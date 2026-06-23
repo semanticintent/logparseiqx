@@ -1,0 +1,36 @@
+2024-01-15 08:00:01 INFO  Application starting up — version 2.4.1
+2024-01-15 08:00:02 INFO  Loading configuration from /etc/app/config.yaml
+2024-01-15 08:00:03 INFO  Connected to database at db-primary.internal:5432
+2024-01-15 08:00:04 INFO  HikariPool-1 — Starting (pool size 10, timeout 30000ms)
+2024-01-15 08:00:05 INFO  Server listening on :8080
+2024-01-15 08:01:12 INFO  GET /health 200 (12ms)
+2024-01-15 08:03:44 INFO  GET /api/users 200 (45ms)
+2024-01-15 08:07:19 INFO  POST /api/auth/login 200 (88ms)
+2024-01-15 08:15:02 WARN  Slow query detected (1243ms): SELECT * FROM sessions WHERE user_id = ? AND expires_at > NOW()
+2024-01-15 08:15:03 INFO  POST /api/auth/login 200 (1301ms)
+2024-01-15 08:22:47 INFO  GET /api/dashboard 200 (134ms)
+2024-01-15 09:00:00 INFO  Scheduled job: session-cleanup started
+2024-01-15 09:00:01 INFO  Scheduled job: session-cleanup completed (deleted 1204 expired sessions)
+2024-01-15 09:14:55 WARN  HikariPool-1 — Connection is not available, request timed out after 30004ms
+2024-01-15 09:14:55 ERROR HikariPool-1 — Unable to acquire JDBC Connection
+2024-01-15 09:14:55 ERROR POST /api/auth/login 500 — SQLTransientConnectionException: HikariPool-1 connection is not available
+2024-01-15 09:14:56 WARN  HikariPool-1 — Connection is not available, request timed out after 30001ms
+2024-01-15 09:14:56 ERROR HikariPool-1 — Unable to acquire JDBC Connection
+2024-01-15 09:14:56 ERROR GET /api/dashboard 500 — SQLTransientConnectionException: HikariPool-1 connection is not available
+2024-01-15 09:14:57 WARN  HikariPool-1 — Connection is not available, request timed out after 30003ms
+2024-01-15 09:14:57 ERROR HikariPool-1 — Unable to acquire JDBC Connection
+2024-01-15 09:14:57 ERROR GET /api/users 500 — SQLTransientConnectionException: HikariPool-1 connection is not available
+2024-01-15 09:15:02 ERROR Database primary unreachable — initiating failover to db-replica.internal:5432
+2024-01-15 09:15:08 INFO  Failover complete — connected to db-replica.internal:5432 (read-write mode)
+2024-01-15 09:15:09 INFO  HikariPool-1 — pool reinitialized (10 connections)
+2024-01-15 09:15:10 INFO  POST /api/auth/login 200 (92ms)
+2024-01-15 09:16:44 INFO  Security: blocked login attempt for user admin@example.com (5 consecutive failures, IP 45.132.204.17)
+2024-01-15 09:16:45 INFO  Security: blocked login attempt for user root@example.com (3 consecutive failures, IP 45.132.204.17)
+2024-01-15 09:18:30 INFO  GET /api/users 200 (41ms)
+2024-01-15 09:22:17 WARN  Upstream service /api/export timed out after 30000ms — returning 502
+2024-01-15 09:22:17 ERROR GET /api/export 502 Bad Gateway (30001ms)
+2024-01-15 09:24:55 INFO  GET /health 200 (9ms)
+2024-01-15 09:30:01 INFO  GET /api/dashboard 200 (118ms)
+2024-01-15 09:45:12 INFO  POST /api/auth/login 200 (76ms)
+2024-01-15 10:00:00 INFO  Scheduled job: metrics-flush started
+2024-01-15 10:00:01 INFO  Scheduled job: metrics-flush completed (2847 metrics flushed to prometheus)
