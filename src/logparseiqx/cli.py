@@ -3,8 +3,8 @@
 LogParseIQX - Local log parser powered by Ollama
 "Like cloud AI log analysis but $0"
 
-Part of Millpond AI.
-https://millpond.ai
+Part of Semantic Intent.
+https://semanticintent.dev
 """
 
 import click
@@ -75,8 +75,8 @@ def cli(ctx, model, version):
         lpx voice examples/app-sample.log
 
     \b
-    Part of Millpond AI.
-    https://millpond.ai
+    Part of Semantic Intent.
+    https://semanticintent.dev
     """
     ctx.ensure_object(dict)
     ctx.obj['model'] = model
@@ -91,7 +91,7 @@ def cli(ctx, model, version):
         console.print(Panel(
             Text(BANNER, style="cyan") + Text(f"\n{TAGLINE}\n\nv{__version__}", style="dim"),
             title="LogParseIQX",
-            subtitle="Part of Millpond AI"
+            subtitle="Part of Semantic Intent"
         ))
         console.print()
         console.print(ctx.get_help())

@@ -2,13 +2,13 @@
 LogParseIQX - Local log parser powered by Ollama
 "Like cloud AI log analysis but $0"
 
-Part of Millpond AI.
-https://millpond.ai
+Part of Semantic Intent.
+https://semanticintent.dev
 """
 
 __version__ = "0.1.0"
-__author__ = "Millpond AI"
-__email__ = "mike@millpond.ai"
+__author__ = "Semantic Intent"
+__email__ = "mike@semanticintent.dev"
 
 # ASCII art banner
 BANNER = r"""

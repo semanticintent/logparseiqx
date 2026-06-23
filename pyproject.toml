@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
 authors = [
-    { name = "Millpond AI", email = "mike@millpond.ai" }
+    { name = "Semantic Intent", email = "mike@semanticintent.dev" }
 ]
 keywords = [
     "log-parser",
@@ -59,7 +59,7 @@ voice = [
 ]
 
 [project.urls]
-Homepage = "https://millpond.ai"
+Homepage = "https://semanticintent.dev"
 Repository = "https://github.com/semanticintent/logparseiqx"
 Documentation = "https://github.com/semanticintent/logparseiqx#readme"
 Issues = "https://github.com/semanticintent/logparseiqx/issues"

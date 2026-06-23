@@ -11,7 +11,7 @@
 
 A local CLI log parser powered by [Ollama](https://ollama.com). Runs entirely on your machine. No tokens. No API costs. Just results.
 
-Part of [Millpond AI](https://millpond.ai).
+Part of [Semantic Intent](https://semanticintent.dev).
 
 ![LogParseIQX CLI](docs/lpx-help.svg)
 
@@ -388,12 +388,12 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- **Website**: [millpond.ai](https://millpond.ai)
+- **Website**: [semanticintent.dev](https://semanticintent.dev)
 - **GitHub**: [github.com/semanticintent/logparseiqx](https://github.com/semanticintent/logparseiqx)
 - **Issues**: [Report bugs or request features](https://github.com/semanticintent/logparseiqx/issues)
 
 ---
 
 <p align="center">
-  <b>Part of Millpond AI</b>
+  <b>Part of Semantic Intent</b>
 </p>
