@@ -13,7 +13,7 @@ A local CLI log parser powered by [Ollama](https://ollama.com). Runs entirely on
 
 Part of [Millpond AI](https://millpond.ai).
 
-![LogParseIQX CLI](docs/lpx-help.png)
+![LogParseIQX CLI](docs/lpx-help.svg)
 
 ---
 
