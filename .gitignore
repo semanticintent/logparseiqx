@@ -51,3 +51,6 @@ extracted/
 
 # Allow sample log files in examples/
 !examples/*.log
+
+# Legacy Windows screenshot — replaced by lpx-help.svg
+docs/lpx-help.png
